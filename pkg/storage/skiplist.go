@@ -6,11 +6,13 @@ import (
 	"sync"
 )
 
+// TODO: combine key and value as one varible//
 type Key []byte
 type Value []byte
 
 type Option func(*SkipList)
 
+// TODO: pass comparable as params //
 func (k Key) Less(k2 Key) bool {
 	for i, b := range k {
 		if i >= len(k2) {
@@ -133,9 +135,10 @@ func (sl *SkipList) Set(key Key, value Value) {
 	level := sl.getLevel()
 
 	if level > sl.currentLevel {
-		level = sl.currentLevel + 1
+		for i := sl.currentLevel; i < level; i++ {
+			sl.tmp[i] = &sl.Node
+		}
 		sl.currentLevel = level
-		sl.tmp[level-1] = &sl.Node
 	}
 
 	node := &Node{

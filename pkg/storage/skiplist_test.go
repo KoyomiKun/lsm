@@ -211,7 +211,7 @@ func BenchmarkSet(b *testing.B) {
 
 func BenchmarkGet(b *testing.B) {
 	const N = math.MaxUint8
-	sk := NewSkipList(WithMaxLevel(32), WithRatio(4))
+	sk := NewSkipList(WithMaxLevel(12), WithRatio(4))
 	for i := 0; i < N; i++ {
 		sk.Set(Key{byte(i)}, Value{byte(i)})
 	}
