@@ -6,73 +6,48 @@ import (
 	"sync"
 )
 
-// TODO: combine key and value as one varible//
-type Key []byte
-type Value []byte
-
-type Option func(*SkipList)
-
-// TODO: pass comparable as params //
-func (k Key) Less(k2 Key) bool {
-	for i, b := range k {
-		if i >= len(k2) {
-			return false
-		}
-		if b < k2[i] {
-			return true
-		}
-		if b > k2[i] {
-			return false
-		}
-	}
-	return false
+type Serializable interface {
+	Serialize() []byte
+	Deserialize([]byte)
 }
 
-func (k Key) Equals(k2 Key) bool {
-	if len(k) != len(k2) {
-		return false
-	}
-	for i, b := range k {
-		if b != k2[i] {
-			return false
-		}
-	}
-	return true
-}
+type Option[K Serializable, V Serializable] func(*SkipList[K, V])
 
-func WithMaxLevel(level int) Option {
-	return func(sl *SkipList) {
+func WithMaxLevel[K Serializable, V Serializable](level int) Option[K, V] {
+	return func(sl *SkipList[K, V]) {
 		sl.maxLevel = level
 	}
 }
 
-func WithRatio(ratio int) Option {
-	return func(sl *SkipList) {
+func WithRatio[K Serializable, V Serializable](ratio int) Option[K, V] {
+	return func(sl *SkipList[K, V]) {
 		sl.ratio = ratio
 	}
 }
 
-type Node struct {
-	key   Key
-	value Value
-	nxt   []*Node
+type Node[K Serializable, V Serializable] struct {
+	key   K
+	value V
+	nxt   []*Node[K, V]
 }
 
-type SkipList struct {
-	Node
+type SkipList[K Serializable, V Serializable] struct {
+	Node[K, V]
 
-	tmp      []*Node
+	tmp      []*Node[K, V]
 	maxLevel int
 	ratio    int // 1 / ratio nodes exists on next level
 
 	currentLevel int
 	currentLen   int
 
+	comparator func(k1 K, k2 K) int
+
 	rmu *sync.RWMutex
 }
 
-func NewSkipList(opts ...Option) *SkipList {
-	l := &SkipList{
+func NewSkipList[K Serializable, V Serializable](opts ...Option[K, V]) *SkipList[K, V] {
+	l := &SkipList[K, V]{
 		maxLevel:     32,
 		ratio:        4,
 		currentLevel: 0,
@@ -85,49 +60,49 @@ func NewSkipList(opts ...Option) *SkipList {
 		opt(l)
 	}
 
-	l.Node.nxt = make([]*Node, l.maxLevel)
-	l.tmp = make([]*Node, l.maxLevel)
+	l.Node.nxt = make([]*Node[K, V], l.maxLevel)
+	l.tmp = make([]*Node[K, V], l.maxLevel)
 	return l
 }
 
-func (sl *SkipList) Get(key Key) Value {
+func (sl *SkipList[K, V]) Get(key K) interface{} {
 	sl.rmu.RLock()
 	defer sl.rmu.RUnlock()
 
 	prev := &sl.Node
 
-	var nxt *Node
+	var nxt *Node[K, V]
 	for i := sl.currentLevel - 1; i >= 0; i-- {
 		nxt = prev.nxt[i]
 		// find the first key >= target at nxt position
-		for nxt != nil && nxt.key.Less(key) {
+		for nxt != nil && sl.comparator(nxt.key, key) == 1 {
 			prev = nxt
 			nxt = prev.nxt[i]
 		}
 	}
-	if nxt != nil && nxt.key.Equals(key) {
+	if nxt != nil && sl.comparator(nxt.key, key) == 0 {
 		return nxt.value
 	}
 
 	return nil
 }
 
-func (sl *SkipList) Set(key Key, value Value) {
+func (sl *SkipList[K, V]) Set(key K, value V) {
 	sl.rmu.Lock()
 	defer sl.rmu.Unlock()
 
 	prev := &sl.Node
-	var nxt *Node
+	var nxt *Node[K, V]
 	for i := sl.currentLevel - 1; i >= 0; i-- {
 		nxt = prev.nxt[i]
-		for nxt != nil && nxt.key.Less(key) {
+		for nxt != nil && sl.comparator(nxt.key, key) == 1 {
 			prev = nxt
 			nxt = prev.nxt[i]
 		}
 		sl.tmp[i] = prev
 	}
 
-	if nxt != nil && nxt.key.Equals(key) {
+	if nxt != nil && sl.comparator(nxt.key, key) == 0 {
 		nxt.value = value
 		return
 	}
@@ -141,10 +116,10 @@ func (sl *SkipList) Set(key Key, value Value) {
 		sl.currentLevel = level
 	}
 
-	node := &Node{
+	node := &Node[K, V]{
 		key:   key,
 		value: value,
-		nxt:   make([]*Node, level),
+		nxt:   make([]*Node[K, V], level),
 	}
 
 	for i := level - 1; i >= 0; i-- {
@@ -156,15 +131,15 @@ func (sl *SkipList) Set(key Key, value Value) {
 
 }
 
-func (sl *SkipList) Delete(key Key) Value {
+func (sl *SkipList[K, V]) Delete(key K) V {
 	sl.rmu.Lock()
 	defer sl.rmu.Unlock()
 
 	prev := &sl.Node
-	var nxt *Node
+	var nxt *Node[K, V]
 	for i := sl.currentLevel - 1; i >= 0; i-- {
 		nxt = prev.nxt[i]
-		for nxt != nil && nxt.key.Less(key) {
+		for nxt != nil && sl.comparator(nxt.key, key) == 1 {
 			prev = nxt
 			nxt = prev.nxt[i]
 		}
@@ -172,8 +147,9 @@ func (sl *SkipList) Delete(key Key) Value {
 		sl.tmp[i] = prev
 	}
 
-	if nxt == nil || !nxt.key.Equals(key) {
-		return nil
+	if nxt == nil || sl.comparator(nxt.key, key) != 0 {
+		var zero V
+		return zero // ugly
 	}
 
 	for i, v := range nxt.nxt {
@@ -189,6 +165,10 @@ func (sl *SkipList) Delete(key Key) Value {
 	return nxt.value
 }
 
+func (sl *SkipList) Len() int {
+	return sl.currentLen
+}
+
 func (sl *SkipList) Print() {
 	fmt.Printf("current len: %d, current level: %d\n", sl.currentLen, sl.currentLevel)
 	for i := 0; i < sl.currentLevel; i++ {
@@ -199,7 +179,6 @@ func (sl *SkipList) Print() {
 		}
 		fmt.Println()
 	}
-
 }
 
 func (sl *SkipList) getLevel() int {
@@ -210,4 +189,43 @@ func (sl *SkipList) getLevel() int {
 		}
 	}
 	return i
+}
+
+func (sl *SkipList) Iter() *SkipListIter {
+	return &SkipListIter{
+		currentNode: &sl.Node,
+	}
+
+}
+
+// READ ONLY!
+type SkipListIter struct {
+	currentNode *Node
+}
+
+func (it *SkipListIter) Key() Comparable {
+	if it.valid() {
+		return it.currentNode.key
+	}
+	return nil
+}
+
+func (it *SkipListIter) Value() interface{} {
+	if it.valid() {
+		return it.currentNode.value
+	}
+	return nil
+}
+
+func (it *SkipListIter) valid() bool {
+	return it.currentNode != nil
+}
+
+// if current position is nil, return false; else return true
+func (it *SkipListIter) Next() bool {
+	if !it.valid() {
+		return false
+	}
+	it.currentNode = it.currentNode.nxt[0]
+	return true
 }

@@ -10,110 +10,110 @@ import (
 
 func TestSetAndGet(t *testing.T) {
 	type KV struct {
-		K Key
-		V Value
+		K IntKey
+		V int
 	}
 	tests := []struct {
 		name string
 		kvs  []KV
-		find Key
-		res  Value
+		find IntKey
+		res  interface{}
 	}{
 		{
 			name: "insert in order",
 			kvs: []KV{
 				{
-					K: Key{1},
-					V: Value{1},
+					K: 1,
+					V: 1,
 				},
 				{
-					K: Key{2},
-					V: Value{2},
+					K: 2,
+					V: 2,
 				},
 				{
-					K: Key{3},
-					V: Value{3},
+					K: 3,
+					V: 3,
 				},
 				{
-					K: Key{4},
-					V: Value{4},
+					K: 4,
+					V: 4,
 				},
 				{
-					K: Key{5},
-					V: Value{5},
+					K: 5,
+					V: 5,
 				},
 			},
-			find: Key{3},
-			res:  Value{3},
+			find: 3,
+			res:  3,
 		},
 		{
 			name: "insert randomly",
 			kvs: []KV{
 				{
-					K: Key{2},
-					V: Value{2},
+					K: 2,
+					V: 2,
 				},
 				{
-					K: Key{7},
-					V: Value{7},
+					K: 7,
+					V: 7,
 				},
 				{
-					K: Key{4},
-					V: Value{4},
+					K: 4,
+					V: 4,
 				},
 				{
-					K: Key{1},
-					V: Value{1},
+					K: 1,
+					V: 1,
 				},
 			},
-			find: Key{7},
-			res:  Value{7},
+			find: 7,
+			res:  7,
 		},
 		{
 			name: "element not exist",
 			kvs: []KV{
 				{
-					K: Key{2},
-					V: Value{2},
+					K: 2,
+					V: 2,
 				},
 				{
-					K: Key{7},
-					V: Value{7},
+					K: 7,
+					V: 7,
 				},
 				{
-					K: Key{4},
-					V: Value{4},
+					K: 4,
+					V: 4,
 				},
 				{
-					K: Key{1},
-					V: Value{1},
+					K: 1,
+					V: 1,
 				},
 			},
-			find: Key{5},
+			find: 5,
 			res:  nil,
 		},
 		{
 			name: "same key",
 			kvs: []KV{
 				{
-					K: Key{2},
-					V: Value{2},
+					K: 2,
+					V: 2,
 				},
 				{
-					K: Key{1},
-					V: Value{1},
+					K: 1,
+					V: 1,
 				},
 				{
-					K: Key{4},
-					V: Value{4},
+					K: 4,
+					V: 4,
 				},
 				{
-					K: Key{1},
-					V: Value{2},
+					K: 1,
+					V: 2,
 				},
 			},
-			find: Key{1},
-			res:  Value{2},
+			find: 1,
+			res:  2,
 		},
 	}
 
@@ -143,49 +143,49 @@ func TestSetAndDelete(t *testing.T) {
 			name: "delete key",
 			kvs: []KV{
 				{
-					K: Key{1},
-					V: Value{1},
+					K: 1,
+					V: 1,
 				},
 				{
-					K: Key{2},
-					V: Value{2},
+					K: 2,
+					V: 2,
 				},
 				{
-					K: Key{3},
-					V: Value{3},
+					K: 3,
+					V: 3,
 				},
 				{
-					K: Key{4},
-					V: Value{4},
+					K: 4,
+					V: 4,
 				},
 				{
-					K: Key{5},
-					V: Value{5},
+					K: 5,
+					V: 5,
 				},
 			},
-			deleted: Key{3},
+			deleted: 3,
 		},
 		{
 			name: "delete key not exist",
 			kvs: []KV{
 				{
-					K: Key{2},
-					V: Value{2},
+					K: 2,
+					V: 2,
 				},
 				{
-					K: Key{7},
-					V: Value{7},
+					K: 7,
+					V: 7,
 				},
 				{
-					K: Key{4},
-					V: Value{4},
+					K: 4,
+					V: 4,
 				},
 				{
-					K: Key{1},
-					V: Value{1},
+					K: 1,
+					V: 1,
 				},
 			},
-			deleted: Key{8},
+			deleted: 8,
 		},
 	}
 
@@ -205,7 +205,7 @@ func TestSetAndDelete(t *testing.T) {
 func BenchmarkSet(b *testing.B) {
 	sk := NewSkipList(WithMaxLevel(32), WithRatio(4))
 	for i := 0; i < b.N; i++ {
-		sk.Set(Key{byte(rand.Uint32())}, Value{byte(rand.Uint32())})
+		sk.Set(rand.Uint32(), rand.Uint32())
 	}
 }
 
@@ -213,10 +213,10 @@ func BenchmarkGet(b *testing.B) {
 	const N = math.MaxUint8
 	sk := NewSkipList(WithMaxLevel(12), WithRatio(4))
 	for i := 0; i < N; i++ {
-		sk.Set(Key{byte(i)}, Value{byte(i)})
+		sk.Set(i, i)
 	}
 	for i := 0; i < b.N; i++ {
-		sk.Get(Key{byte(rand.Uint32() % N)})
+		sk.Get(rand.Uint32() % N)
 	}
 }
 
@@ -224,9 +224,9 @@ func BenchmarkDelete(b *testing.B) {
 	const N = math.MaxUint8
 	sk := NewSkipList(WithMaxLevel(32), WithRatio(4))
 	for i := 0; i < N; i++ {
-		sk.Set(Key{byte(i)}, Value{byte(i)})
+		sk.Set(i, i)
 	}
 	for i := 0; i < b.N; i++ {
-		sk.Delete(Key{byte(rand.Uint32() % N)})
+		sk.Delete(rand.Uint32() % N)
 	}
 }
